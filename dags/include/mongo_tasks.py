@@ -62,7 +62,7 @@ def remap_fields(source_table, table_info) -> List[Dict[str, Any]]:
 
 def insert_mongo_document(document_list, document_info, primary_value=None):
     from airflow.providers.mongo.hooks.mongo import MongoHook
-    from pymongo import ReplaceOne
+    from pymongo import UpdateOne
 
     mongo_target_hook = MongoHook(conn_id="mongo-core-target")
     target_name = document_info["target"]
@@ -71,58 +71,60 @@ def insert_mongo_document(document_list, document_info, primary_value=None):
     target_keys = document_list["fields"]
     target_values = document_list["values"]
     target_primary_key = document_info["target_primary_key"]
-    target_document_generator = (
-        dict(zip(target_keys, target_value)) for target_value in target_values
-    )
+    truncated_primary_key = target_primary_key.split(".", 1)[0]
+    if document_info.get("single_row_array"):
+        if len(target_keys) != 1:
+            return
+        target_document_generator = [target_value[0] for target_value in target_values]
+    else:
+        target_document_generator = (
+            dict(zip(target_keys, target_value)) for target_value in target_values
+        )
+    target_field = document_info.get("target_subdocument_field")
     target_update_generator = []
-    if primary_value is None:
+    if target_field is None:
         target_update_generator = [
-            ReplaceOne(
-                {target_primary_key: target_document[target_primary_key]},
-                target_document,
+            UpdateOne(
+                {target_primary_key: target_document[truncated_primary_key]},
+                {"$set": target_document},
                 upsert=True,
             )
             for target_document in target_document_generator
         ]
         mongo_target_collection.bulk_write(target_update_generator)
     else:
-        target_field = document_info["target_subdocument_field"]
-        mongo_target_collection.update_many(
+        if primary_value is None:
+            return
+        mongo_target_collection.update_one(
             {target_primary_key: primary_value},
             {"$push": {target_field: {"$each": list(target_document_generator)}}},
             upsert=True,
         )
 
 
-def run_mongo_subdocument(document_info):
+def odbc_fetch_subkeys(document_info, source_foreign_key):
     from airflow.providers.odbc.hooks.odbc import OdbcHook
 
-    # from airflow.providers.mongo.hooks.mongo import MongoHook
-
-    # mongo_target_hook = MongoHook(conn_id="mongo-core-target")
-
-    source_foreign_key = document_info["source_foreign_key"]
-    # mongo_target_collection = mongo_target_hook.get_collection(target_name)
     dsql_hook = OdbcHook(odbc_conn_id="odbc-core-source")
     connection = dsql_hook.get_conn()
     cursor = connection.cursor()
     table_name = document_info["source"]
     query_data = f"SELECT DISTINCT {source_foreign_key} FROM {table_name}"
     cursor.execute(query_data)
-    # primary_value_list = (
-    #     value[target_primary_key]
-    #     for value in mongo_target_collection.find(
-    #         projection={target_primary_key: 1, "_id": 0}
-    #     )
-    # )
+
     while True:
         fetched_rows = cursor.fetchmany(30)
         if not fetched_rows:
             break
-        primary_value_list = (row[0] for row in fetched_rows)
-        # print(primary_value_list)
+        row_list = [row[0] for row in fetched_rows]
+    yield row_list
+
+
+def run_mongo_subdocument(document_info):
+    source_foreign_key = document_info["source_foreign_key"]
+    primary_value_list_generator = odbc_fetch_subkeys(document_info, source_foreign_key)
+    for primary_value_list in primary_value_list_generator:
         for primary_value in primary_value_list:
-            # print(primary_value)
             subdoc_condition_string = f"WHERE {source_foreign_key} = {primary_value}"
             run_mongo_document(document_info, subdoc_condition_string, primary_value)
 

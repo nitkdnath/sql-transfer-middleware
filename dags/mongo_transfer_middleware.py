@@ -43,7 +43,8 @@ def mongo_transfer_middleware():
     config = config_sanitizer(
         Variable.get("MONGODB_MIDDLEWARE_MAPPING", deserialize_json=True)
     )
-    insert_document_tasks(config) >> insert_subdocument_tasks(config)
+    insert_document_tasks(config)
+    insert_subdocument_tasks(config)
     # for document in config:
     #     if document.get("source_foreign_key") is not None:
     #         continue
