@@ -18,9 +18,7 @@ def sql_transfer_middleware():
     def generate_temp_table(table_info):
         from airflow.providers.odbc.hooks.odbc import OdbcHook
 
-        destination_hook = OdbcHook(
-            odbc_conn_id="odbc-core-target",
-        )
+        destination_hook = OdbcHook(odbc_conn_id="odbc-core-target", )
         column_list = []
         pk = table_info["primary_key"]
         for column in table_info["columns"]:
@@ -30,8 +28,7 @@ def sql_transfer_middleware():
         table_specific_sql = (
             f"DROP TABLE IF EXISTS {table_info['schema']}.temp_{table_info['target']};\n"
             f"CREATE TABLE {table_info['schema']}.temp_{table_info['target']} (\n{column_string},\n"
-            f"PRIMARY KEY ({pk})\n);"
-        )
+            f"PRIMARY KEY ({pk})\n);")
         connection = destination_hook.get_conn()
         cursor = connection.cursor()
         cursor.execute(table_specific_sql)
@@ -42,13 +39,13 @@ def sql_transfer_middleware():
     def merge_temp_into_target(table_info):
         from airflow.providers.odbc.hooks.odbc import OdbcHook
 
-        destination_hook = OdbcHook(
-            odbc_conn_id="odbc-core-target",
-        )
+        destination_hook = OdbcHook(odbc_conn_id="odbc-core-target", )
         column_list = [column["target"] for column in table_info["columns"]]
-        col_str = ", ".join(column["target"] for column in table_info["columns"])
+        col_str = ", ".join(column["target"]
+                            for column in table_info["columns"])
         # print(col_str)
-        source_col_str = ", ".join(f"Source.{column}" for column in column_list)
+        source_col_str = ", ".join(f"Source.{column}"
+                                   for column in column_list)
         # print(source_col_str)
         table_merge_query = (
             f"ALTER TABLE {table_info['schema']}.{table_info['target']} NOCHECK CONSTRAINT ALL;\n"
@@ -57,8 +54,7 @@ def sql_transfer_middleware():
             f"ON Source.{table_info['primary_key']} = Target.{table_info['primary_key']}\n"
             "WHEN NOT MATCHED BY Target THEN\n"
             f"\tINSERT ({col_str})\n"
-            f"\tVALUES ({source_col_str})"
-        )
+            f"\tVALUES ({source_col_str})")
         # print("Reached here")
         merge_string = table_merge_query + ";"
         connection = destination_hook.get_conn()
@@ -82,8 +78,7 @@ def sql_transfer_middleware():
             insert_data_into_temp_table(target_table, table_info)
 
     config = config_sanitizer(
-        Variable.get("AACC_MIDDLEWARE_MAPPING", deserialize_json=True)
-    )
+        Variable.get("AACC_MIDDLEWARE_MAPPING", deserialize_json=True))
     for table in config:
         # target_table = remap_columns(load_sql(table), table)
         temp_table_gen = generate_temp_table(table)
