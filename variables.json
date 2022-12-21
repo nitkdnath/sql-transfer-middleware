@@ -1,0 +1,100 @@
+{
+    "AACC_MIDDLEWARE_MAPPING": [
+        {
+            "columns": [
+                {
+                    "source": "material_id",
+                    "target": "material_id2",
+                    "type_string": "INT NOT NULL"
+                },
+                {
+                    "source": "material_name"
+                }
+            ],
+            "primary_key": "material_id2",
+            "schema": "materials",
+            "source": "test_materials"
+        },
+        {
+            "columns": [
+                {
+                    "source": "component_id",
+                    "type_string": "INT NOT NULL"
+                },
+                {
+                    "source": "component_name"
+                },
+                {
+                    "source": "component_collation"
+                }
+            ],
+            "primary_key": "component_id",
+            "source": "components",
+            "target": "components_extra"
+        }
+    ],
+    "MONGODB_MIDDLEWARE_MAPPING": [
+        {
+            "fields": [
+                {
+                    "source": "material_id",
+                    "target": "material_id2"
+                },
+                {
+                    "source": "material_name"
+                }
+            ],
+            "source": "test_materials",
+            "target_primary_key": "material_id2"
+        },
+        {
+            "fields": [
+                {
+                    "source": "component_id"
+                },
+                {
+                    "source": "component_name"
+                },
+                {
+                    "source": "component_collation"
+                }
+            ],
+            "source": "components",
+            "target": "components_extra",
+            "target_primary_key": "component_id"
+        },
+        {
+            "fields": [
+                {
+                    "source": "extra_parts"
+                }
+            ],
+            "single_row_array": true,
+            "source": "sub_objects",
+            "source_foreign_key": "material_id",
+            "target": "test_materials",
+            "target_primary_key": "material_id2",
+            "target_subdocument_field": "subobjects_hybrid"
+        },
+        {
+            "fields": [
+                {
+                    "source": "extra_parts"
+                },
+                {
+                    "source": "hybrids",
+                    "target": "test_hybrids"
+                },
+                {
+                    "source": "exec_level",
+                    "target": "execution_level"
+                }
+            ],
+            "source": "sub_objects",
+            "source_foreign_key": "material_id",
+            "target": "test_materials",
+            "target_primary_key": "material_id2",
+            "target_subdocument_field": "material_subobjects"
+        }
+    ]
+}
